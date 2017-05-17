@@ -11,6 +11,7 @@ namespace Neos\Neos\Domain\Strategy;
  * source code.
  */
 
+use Neos\ContentRepository\Domain\Model\NodeInterface;
 use Neos\Flow\Annotations as Flow;
 use Neos\Flow\Persistence\PersistenceManagerInterface;
 use Neos\Neos\Domain\Service\SiteService;
@@ -89,23 +90,15 @@ class AssetUsageInNodePropertiesStrategy extends AbstractAssetUsageStrategy
             return $this->firstlevelCache[$assetIdentifier];
         }
 
-        $userWorkspace = $this->userService->getPersonalWorkspace();
-
         $relatedNodes = [];
         foreach ($this->getRelatedNodes($asset) as $relatedNodeData) {
-            $accessible = $this->domainUserService->currentUserCanReadWorkspace($relatedNodeData->getWorkspace());
-            if ($accessible) {
-                $context = $this->createContextMatchingNodeData($relatedNodeData);
-            } else {
-                $context = $this->createContentContext($userWorkspace->getName());
-            }
-            $site = $context->getCurrentSite();
+            $context = $this->createContextMatchingNodeData($relatedNodeData);
             $node = $this->nodeFactory->createFromNodeData($relatedNodeData, $context);
             $flowQuery = new FlowQuery([$node]);
-            /** @var \Neos\ContentRepository\Domain\Model\NodeInterface $documentNode */
+            /** @var NodeInterface $documentNode */
             $documentNode = $flowQuery->closest('[instanceof Neos.Neos:Document]')->get(0);
 
-            $relatedNodes[] = new AssetUsageInNodeProperties($asset, $site, $documentNode, $node, $accessible);
+            $relatedNodes[] = new AssetUsageInNodeProperties($asset, $context->getCurrentSite(), $documentNode, $node, $this->domainUserService->currentUserCanReadWorkspace($relatedNodeData->getWorkspace()));
         }
 
         $this->firstlevelCache[$assetIdentifier] = $relatedNodes;
