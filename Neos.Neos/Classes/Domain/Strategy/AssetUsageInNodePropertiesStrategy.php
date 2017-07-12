@@ -11,9 +11,11 @@ namespace Neos\Neos\Domain\Strategy;
  * source code.
  */
 
+use Neos\ContentRepository\Domain\Model\NodeData;
 use Neos\ContentRepository\Domain\Model\NodeInterface;
 use Neos\Flow\Annotations as Flow;
 use Neos\Flow\Persistence\PersistenceManagerInterface;
+use Neos\Flow\Security\Context as SecurityContext;
 use Neos\Neos\Domain\Service\SiteService;
 use Neos\Utility\TypeHandling;
 use Neos\Media\Domain\Model\AssetInterface;
@@ -77,6 +79,12 @@ class AssetUsageInNodePropertiesStrategy extends AbstractAssetUsageStrategy
     protected $persistenceManager;
 
     /**
+     * @Flow\Inject
+     * @var SecurityContext
+     */
+    protected $securityContext;
+
+    /**
      * Returns an array of usage reference objects.
      *
      * @param AssetInterface $asset
@@ -92,13 +100,18 @@ class AssetUsageInNodePropertiesStrategy extends AbstractAssetUsageStrategy
 
         $relatedNodes = [];
         foreach ($this->getRelatedNodes($asset) as $relatedNodeData) {
+            /** @var NodeData $relatedNodeData */
             $context = $this->createContextMatchingNodeData($relatedNodeData);
             $node = $this->nodeFactory->createFromNodeData($relatedNodeData, $context);
-            $flowQuery = new FlowQuery([$node]);
-            /** @var NodeInterface $documentNode */
-            $documentNode = $flowQuery->closest('[instanceof Neos.Neos:Document]')->get(0);
+            $this->securityContext->withoutAuthorizationChecks(function () use ($node, &$documentNode) {
+                $flowQuery = new FlowQuery([$node]);
+                /** @var NodeInterface $documentNode */
+                $documentNode = $flowQuery->closest('[instanceof Neos.Neos:Document]')->get(0);
+            });
 
-            $relatedNodes[] = new AssetUsageInNodeProperties($asset, $context->getCurrentSite(), $documentNode, $node, $this->domainUserService->currentUserCanReadWorkspace($relatedNodeData->getWorkspace()));
+            $site = $context->getCurrentSite();
+            $accessible = $this->domainUserService->currentUserCanReadWorkspace($relatedNodeData->getWorkspace());
+            $relatedNodes[] = new AssetUsageInNodeProperties($asset, $site, $documentNode, $node, $accessible);
         }
 
         $this->firstlevelCache[$assetIdentifier] = $relatedNodes;
@@ -126,6 +139,10 @@ class AssetUsageInNodePropertiesStrategy extends AbstractAssetUsageStrategy
             }
         }
 
-        return $this->nodeDataRepository->findNodesByPathPrefixAndRelatedEntities(SiteService::SITES_ROOT_PATH, $relationMap);
+        $allRelatedNodeDatas = $this->nodeDataRepository->findNodesByPathPrefixAndRelatedEntities(SiteService::SITES_ROOT_PATH, $relationMap);
+
+        return array_filter($allRelatedNodeDatas, function (NodeData $relatedNodeData) {
+            return !$relatedNodeData->isInternal();
+        });
     }
 }
