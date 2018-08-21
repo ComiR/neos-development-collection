@@ -44,13 +44,13 @@ class CreateNodePrivilege extends AbstractNodePrivilege
 
         $this->initialize();
         $this->evaluateNodeContext();
+        $allowedCreationNodeTypes = $this->getCreationNodeTypes();
         if ($subject instanceof MethodPrivilegeSubject) {
             if ($this->methodPrivilege->matchesSubject($subject) === false) {
                 return false;
             }
 
             $joinPoint = $subject->getJoinPoint();
-            $allowedCreationNodeTypes = $this->nodeContext->getCreationNodeTypes();
             $actualNodeType = $joinPoint->getMethodName() === 'createNodeFromTemplate' ? $joinPoint->getMethodArgument('nodeTemplate')->getNodeType()->getName() : $joinPoint->getMethodArgument('nodeType')->getName();
 
             if ($allowedCreationNodeTypes !== array() && !in_array($actualNodeType, $allowedCreationNodeTypes)) {
@@ -64,9 +64,17 @@ class CreateNodePrivilege extends AbstractNodePrivilege
             return $result;
         }
 
-        if ($this->nodeContext->getCreationNodeTypes() === array() || ($subject->hasCreationNodeType() === false) || in_array($subject->getCreationNodeType()->getName(), $this->nodeContext->getCreationNodeTypes()) === true) {
+        if ($allowedCreationNodeTypes === [] || !$subject->hasCreationNodeType()) {
             return parent::matchesSubject($subject);
         }
+
+        $creationNodeType = $subject->getCreationNodeType();
+        foreach ($allowedCreationNodeTypes as $allowedCreationNodeType) {
+            if ($creationNodeType->isOfType($allowedCreationNodeType)) {
+                return parent::matchesSubject($subject);
+            }
+        }
+
         return false;
     }
 
