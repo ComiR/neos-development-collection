@@ -11,6 +11,9 @@ namespace Neos\ContentRepository\Security\Authorization\Privilege\Node;
  * source code.
  */
 
+use Neos\ContentRepository\Domain\Model\NodeType;
+use Neos\ContentRepository\Domain\Service\NodeTypeManager;
+use Neos\Flow\Annotations as Flow;
 
 /**
  * An Eel context matching expression for the CreateNodePrivilege
@@ -18,17 +21,37 @@ namespace Neos\ContentRepository\Security\Authorization\Privilege\Node;
 class CreateNodePrivilegeContext extends NodePrivilegeContext
 {
     /**
-     * @var string
+     * @Flow\Inject
+     * @var NodeTypeManager
      */
-    protected $creationNodeTypes;
+    protected $nodeTypeManager;
+
+    /**
+     * @var array
+     */
+    protected $creationNodeTypes = [];
 
     /**
      * @param string|array $creationNodeTypes either an array of supported node type identifiers or a single node type identifier (for example "Neos.Neos:Document")
+     * @param boolean $includeSubNodeTypes indicates if the sub node types should be added to the allowed node types
+     *
      * @return boolean Has to return true, to evaluate the eel expression correctly in any case
      */
-    public function createdNodeIsOfType($creationNodeTypes)
+    public function createdNodeIsOfType($creationNodeTypes, bool $includeSubNodeTypes = false)
     {
-        $this->creationNodeTypes = $creationNodeTypes;
+        $this->creationNodeTypes = is_array($creationNodeTypes) ? $creationNodeTypes : [$creationNodeTypes];
+
+        if ($includeSubNodeTypes) {
+            $creationNodeTypeNames = [];
+            foreach ($this->creationNodeTypes as $creationNodeType) {
+                foreach ($this->nodeTypeManager->getSubNodeTypes($creationNodeType) as $subNodeType) {
+                    /** @var NodeType $subNodeType */
+                    $creationNodeTypeNames[$subNodeType->getName()] = true;
+                }
+            }
+            $this->creationNodeTypes = array_merge($this->creationNodeTypes, array_keys($creationNodeTypeNames));
+        }
+
         return true;
     }
 
@@ -37,11 +60,6 @@ class CreateNodePrivilegeContext extends NodePrivilegeContext
      */
     public function getCreationNodeTypes()
     {
-        if (is_array($this->creationNodeTypes)) {
-            return $this->creationNodeTypes;
-        } elseif (is_string($this->creationNodeTypes)) {
-            return [$this->creationNodeTypes];
-        }
-        return [];
+        return $this->creationNodeTypes;
     }
 }
