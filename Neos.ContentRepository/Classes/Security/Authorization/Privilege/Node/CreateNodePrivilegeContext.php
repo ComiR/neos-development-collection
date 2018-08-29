@@ -11,6 +11,8 @@ namespace Neos\ContentRepository\Security\Authorization\Privilege\Node;
  * source code.
  */
 
+use Neos\ContentRepository\Domain\Model\NodeType;
+use Neos\ContentRepository\Domain\Service\NodeTypeManager;
 use Neos\Flow\Annotations as Flow;
 
 /**
@@ -19,17 +21,39 @@ use Neos\Flow\Annotations as Flow;
 class CreateNodePrivilegeContext extends NodePrivilegeContext
 {
     /**
-     * @var string
+     * @Flow\Inject
+     * @var NodeTypeManager
      */
-    protected $creationNodeTypes;
+    protected $nodeTypeManager;
+
+    /**
+     * @var array
+     */
+    protected $creationNodeTypes = [];
 
     /**
      * @param string|array $creationNodeTypes either an array of supported node type identifiers or a single node type identifier (for example "Neos.Neos:Document")
+     * @param boolean $includeSubNodeTypes indicates if the sub node types should be added to the allowed node types
+     *
      * @return boolean Has to return TRUE, to evaluate the eel expression correctly in any case
      */
-    public function createdNodeIsOfType($creationNodeTypes)
+    public function createdNodeIsOfType($creationNodeTypes, bool $includeSubNodeTypes = false)
     {
-        $this->creationNodeTypes = $creationNodeTypes;
+        $this->creationNodeTypes = is_array($creationNodeTypes) ? $creationNodeTypes : [$creationNodeTypes];
+
+        if ($includeSubNodeTypes) {
+            /** @var NodeType[] $subNodeTypes */
+            $subNodeTypes = [];
+            foreach ($this->creationNodeTypes as $creationNodeType) {
+                $subNodeTypes += $this->nodeTypeManager->getSubNodeTypes($creationNodeType);
+            }
+            $creationNodeTypeNames = [];
+            foreach ($subNodeTypes as $subNodeType) {
+                $creationNodeTypeNames[$subNodeType->getName()] = true;
+            }
+            $this->creationNodeTypes = array_keys($creationNodeTypeNames);
+        }
+
         return true;
     }
 
@@ -38,11 +62,6 @@ class CreateNodePrivilegeContext extends NodePrivilegeContext
      */
     public function getCreationNodeTypes()
     {
-        if (is_array($this->creationNodeTypes)) {
-            return $this->creationNodeTypes;
-        } elseif (is_string($this->creationNodeTypes)) {
-            return array($this->creationNodeTypes);
-        }
-        return array();
+        return $this->creationNodeTypes;
     }
 }
