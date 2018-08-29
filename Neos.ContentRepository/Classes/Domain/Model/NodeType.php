@@ -177,21 +177,10 @@ class NodeType
      */
     protected function buildInheritanceChain()
     {
-        $superTypes = array();
-        foreach ($this->declaredSuperTypes as $superTypeName => $superType) {
-            if ($superType !== null) {
-                $this->addInheritedSuperTypes($superTypes, $superType);
-                $superTypes[$superTypeName] = $superType;
-            }
-        }
+        $superTypes = [];
+        $this->addInheritedSuperTypes($superTypes, $this);
 
-        foreach ($this->declaredSuperTypes as $superTypeName => $superType) {
-            if ($superType === null) {
-                unset($superTypes[$superTypeName]);
-            }
-        }
-
-        return array_unique($superTypes);
+        return $superTypes;
     }
 
     /**
@@ -208,10 +197,13 @@ class NodeType
             $superTypes[$inheritedSuperTypeName] = $inheritedSuperType;
         }
 
-        $superTypesInSuperType = $superType->getConfiguration('superTypes') ?: [];
-        foreach ($superTypesInSuperType as $inheritedSuperTypeName => $inheritedSuperType) {
-            if (!$inheritedSuperType) {
-                unset($superTypes[$inheritedSuperTypeName]);
+        $superTypesLocalConfig = $superType->getLocalConfiguration();
+        if (isset($superTypesLocalConfig['superTypes'])) {
+            $superTypesInSuperType = $superTypesLocalConfig['superTypes'] ?: [];
+            foreach ($superTypesInSuperType as $inheritedSuperTypeName => $inheritedSuperType) {
+                if (!$inheritedSuperType) {
+                    unset($superTypes[$inheritedSuperTypeName]);
+                }
             }
         }
     }
