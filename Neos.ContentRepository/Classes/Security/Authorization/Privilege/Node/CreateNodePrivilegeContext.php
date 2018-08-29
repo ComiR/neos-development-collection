@@ -19,9 +19,9 @@ use Neos\Flow\Annotations as Flow;
 class CreateNodePrivilegeContext extends NodePrivilegeContext
 {
     /**
-     * @var string
+     * @var array
      */
-    protected $creationNodeTypes;
+    protected $creationNodeTypes = [];
 
     /**
      * @param string|array $creationNodeTypes either an array of supported node type identifiers or a single node type identifier (for example "Neos.Neos:Document")
@@ -29,7 +29,7 @@ class CreateNodePrivilegeContext extends NodePrivilegeContext
      */
     public function createdNodeIsOfType($creationNodeTypes)
     {
-        $this->creationNodeTypes = $creationNodeTypes;
+        $this->creationNodeTypes = is_string($creationNodeTypes) ? [$creationNodeTypes] : $creationNodeTypes;
         return true;
     }
 
@@ -38,11 +38,6 @@ class CreateNodePrivilegeContext extends NodePrivilegeContext
      */
     public function getCreationNodeTypes()
     {
-        if (is_array($this->creationNodeTypes)) {
-            return $this->creationNodeTypes;
-        } elseif (is_string($this->creationNodeTypes)) {
-            return array($this->creationNodeTypes);
-        }
-        return array();
+        return $this->creationNodeTypes;
     }
 }
